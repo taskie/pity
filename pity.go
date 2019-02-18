@@ -28,6 +28,7 @@ type Executor struct {
 	CommandArgs      []string
 	SleepAfterLaunch time.Duration
 	CharWait         time.Duration
+	PreLineWait      time.Duration
 	LineWait         time.Duration
 	ptmx             *os.File
 }
@@ -40,6 +41,7 @@ func NewExecutor(w io.Writer, r io.Reader, name string, args ...string) *Executo
 		CommandArgs:      args,
 		SleepAfterLaunch: 1000 * time.Millisecond,
 		CharWait:         100 * time.Millisecond,
+		PreLineWait:      0,
 		LineWait:         1000 * time.Millisecond,
 	}
 }
@@ -71,6 +73,15 @@ func (e *Executor) commandLineWait(arg string) {
 		return
 	}
 	e.LineWait = d
+}
+
+func (e *Executor) commandPreLineWait(arg string) {
+	d, err := time.ParseDuration(arg)
+	if err != nil {
+		logrus.Warn(err)
+		return
+	}
+	e.PreLineWait = d
 }
 
 func (e *Executor) commandSleep(arg string) {
@@ -118,6 +129,8 @@ func (e *Executor) invokeCommand(command string, arg ...string) {
 	switch command {
 	case "c", "charwait":
 		e.commandCharWait(arg[0])
+	case "p", "prelinewait":
+		e.commandPreLineWait(arg[0])
 	case "l", "linewait":
 		e.commandLineWait(arg[0])
 	case "s", "sleep":
@@ -133,6 +146,11 @@ func (e *Executor) invokeCommand(command string, arg ...string) {
 	}
 
 }
+
+var (
+	commandLineRe = regexp.MustCompile(`^#pity\s+([\w\^]+)(?:\s+(.+))?$`)
+	noLfRe        = regexp.MustCompile(`#pity\s+(n(?:olf)?)$`)
+)
 
 func (e *Executor) ExecuteContext(ctx context.Context) error {
 	c := exec.CommandContext(ctx, e.CommandName, e.CommandArgs...)
@@ -159,17 +177,23 @@ func (e *Executor) ExecuteContext(ctx context.Context) error {
 		scanner := bufio.NewScanner(e.Reader)
 		for scanner.Scan() {
 			l := scanner.Text()
-			re := regexp.MustCompile(`^#pity\s+([\w\^]+)(?:\s+(.+))?$`)
-			sub := re.FindStringSubmatch(l)
-			if sub != nil {
-				e.invokeCommand(sub[1], sub[2:]...)
+			lineCommand := commandLineRe.FindStringSubmatch(l)
+			noLf := noLfRe.FindStringSubmatch(l)
+			if noLf != nil {
+				l = noLfRe.ReplaceAllString(l, "")
+			}
+			if lineCommand != nil {
+				e.invokeCommand(lineCommand[1], lineCommand[2:]...)
 			} else {
 				for _, c := range l {
 					ptmx.WriteString(string(c))
 					time.Sleep(e.CharWait)
 				}
-				ptmx.WriteString("\n")
-				time.Sleep(e.LineWait)
+				if noLf == nil {
+					time.Sleep(e.PreLineWait)
+					ptmx.WriteString("\n")
+					time.Sleep(e.LineWait)
+				}
 			}
 		}
 		if err := scanner.Err(); err != nil {
