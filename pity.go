@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"regexp"
+	"strings"
 	"syscall"
 	"time"
 
@@ -22,15 +23,16 @@ var (
 )
 
 type Executor struct {
-	Writer           io.Writer
-	Reader           io.Reader
-	CommandName      string
-	CommandArgs      []string
-	SleepAfterLaunch time.Duration
-	CharWait         time.Duration
-	PreLineWait      time.Duration
-	LineWait         time.Duration
-	ptmx             *os.File
+	Writer            io.Writer
+	Reader            io.Reader
+	CommandName       string
+	CommandArgs       []string
+	SleepAfterLaunch  time.Duration
+	CharWait          time.Duration
+	PreLineWait       time.Duration
+	LineWait          time.Duration
+	ptmx              *os.File
+	blockCommentDepth int
 }
 
 func NewExecutor(w io.Writer, r io.Reader, name string, args ...string) *Executor {
@@ -126,7 +128,7 @@ func (e *Executor) commandHex(arg string) {
 var spaceRe = regexp.MustCompile(`\s+`)
 
 func (e *Executor) invokeCommand(command string, arg ...string) {
-	switch command {
+	switch strings.ToLower(command) {
 	case "c", "charwait":
 		e.commandCharWait(arg[0])
 	case "p", "prelinewait":
@@ -141,6 +143,15 @@ func (e *Executor) invokeCommand(command string, arg ...string) {
 		e.commandDecimal(arg[0])
 	case "x", "hex":
 		e.commandHex(arg[0])
+	case "#", "linecomment":
+		break
+	case "<", "blockcommentstart":
+		e.blockCommentDepth++
+	case ">", "blockcommentend":
+		e.blockCommentDepth--
+		if e.blockCommentDepth < 0 {
+			e.blockCommentDepth = 0
+		}
 	default:
 		logrus.Warnf("invalid command: %s", command)
 	}
@@ -148,7 +159,7 @@ func (e *Executor) invokeCommand(command string, arg ...string) {
 }
 
 var (
-	commandLineRe = regexp.MustCompile(`^#pity\s+([\w\^]+)(?:\s+(.+))?$`)
+	commandLineRe = regexp.MustCompile(`^#pity\s+([\w\^#<>]+)(?:\s+(.+))?$`)
 	noLfRe        = regexp.MustCompile(`#pity\s+(n(?:olf)?)$`)
 )
 
@@ -184,6 +195,8 @@ func (e *Executor) ExecuteContext(ctx context.Context) error {
 			}
 			if lineCommand != nil {
 				e.invokeCommand(lineCommand[1], lineCommand[2:]...)
+			} else if e.blockCommentDepth >= 1 {
+				// do nothing
 			} else {
 				for _, c := range l {
 					ptmx.WriteString(string(c))
