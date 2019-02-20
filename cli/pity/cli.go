@@ -71,10 +71,12 @@ func run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	defer inputFile.Close()
 	outputFile, err := opener.Create(output)
 	if err != nil {
 		return err
 	}
+	defer outputFile.Close()
 
 	return pity.NewExecutor(outputFile, inputFile, cmdName, cmdArgs...).Execute()
 }
