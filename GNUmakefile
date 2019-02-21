@@ -29,13 +29,14 @@ dep-init:
 dep-ensure:
 	dep ensure
 
-dep-graph:
+dep-graph: images/dependency.png
+
+images/dependency.png: Gopkg.lock
 	mkdir -p images
 	dep status -dot | grep -v '^The status of ' | dot -Tpng -o images/dependency.png
 
 pre-commit:
 	$(MAKE) dep-ensure
-	$(MAKE) dep-graph
 	$(MAKE) fmt
 	$(MAKE) build
 	$(MAKE) coverage
