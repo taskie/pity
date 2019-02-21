@@ -11,14 +11,14 @@ install:
 	$(MAKE) -C $(CMD_DIR) install
 
 test:
-	go test
+	go test ./...
 
 fmt:
 	find . -name '*.go' | xargs gofmt -w
 
 coverage:
 	mkdir -p test/coverage
-	go test -race -coverprofile=test/coverage/cover.out
+	go test -race -coverprofile=test/coverage/cover.out ./...
 	go tool cover -html=test/coverage/cover.out -o test/coverage/cover.html
 
 dep-init:
@@ -39,3 +39,7 @@ pre-commit:
 	$(MAKE) fmt
 	$(MAKE) build
 	$(MAKE) coverage
+
+install-pre-commit:
+	echo 'make pre-commit' >.git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit

@@ -9,13 +9,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/taskie/jc"
 	"github.com/taskie/osplus"
 	"github.com/taskie/pity"
 )
 
 type Config struct {
-	Input, Output string
+	Input, Output, LogLevel string
 }
 
 var configFile string
@@ -27,12 +26,12 @@ var (
 const CommandName = "pity"
 
 func init() {
-	Command.PersistentFlags().StringVar(&configFile, "config", "c", "config file (default: pity.yml)")
+	Command.PersistentFlags().StringVar(&configFile, "config", "", `config file (default: "pity.yml")`)
 	Command.Flags().StringP("input", "i", "pity.txt", "pity input file")
 	Command.Flags().StringP("output", "o", "", "terminal output file")
 	Command.Flags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
-	Command.Flags().BoolVarP(&debug, "debug", "g", false, "debug output")
 	Command.Flags().BoolVarP(&version, "version", "V", false, "show Version")
+	Command.Flags().BoolVar(&debug, "debug", false, "debug output")
 
 	viper.BindPFlag("Input", Command.Flags().Lookup("input"))
 	viper.BindPFlag("Output", Command.Flags().Lookup("output"))
@@ -79,7 +78,8 @@ func Main() {
 }
 
 var Command = &cobra.Command{
-	Use: CommandName,
+	Use:  CommandName,
+	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		err := run(cmd, args)
 		if err != nil {
@@ -90,8 +90,16 @@ var Command = &cobra.Command{
 
 func run(cmd *cobra.Command, args []string) error {
 	if version {
-		fmt.Println(jc.Version)
+		fmt.Println(pity.Version)
 		return nil
+	}
+	if config.LogLevel != "" {
+		lv, err := log.ParseLevel(config.LogLevel)
+		if err != nil {
+			log.Warn(err)
+		} else {
+			log.SetLevel(lv)
+		}
 	}
 	if debug {
 		if viper.ConfigFileUsed() != "" {
