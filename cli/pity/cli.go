@@ -78,7 +78,7 @@ func Main() {
 }
 
 var Command = &cobra.Command{
-	Use:  CommandName,
+	Use:  CommandName + " [COMMAND] [ARGS...]",
 	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		err := run(cmd, args)
