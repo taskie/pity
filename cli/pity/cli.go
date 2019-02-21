@@ -5,38 +5,72 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sirupsen/logrus"
+	"github.com/k0kubun/pp"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/taskie/jc"
 	"github.com/taskie/osplus"
 	"github.com/taskie/pity"
 )
 
+type Config struct {
+	Input, Output string
+}
+
+var configFile string
+var config Config
 var (
-	cfgFile, input, output string
+	verbose, debug, version bool
 )
 
+const CommandName = "pity"
+
 func init() {
+	Command.PersistentFlags().StringVar(&configFile, "config", "c", "config file (default: pity.yml)")
+	Command.Flags().StringP("input", "i", "pity.txt", "pity input file")
+	Command.Flags().StringP("output", "o", "", "terminal output file")
+	Command.Flags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
+	Command.Flags().BoolVarP(&debug, "debug", "g", false, "debug output")
+	Command.Flags().BoolVarP(&version, "version", "V", false, "show Version")
+
+	viper.BindPFlag("Input", Command.Flags().Lookup("input"))
+	viper.BindPFlag("Output", Command.Flags().Lookup("output"))
+
 	cobra.OnInitialize(initConfig)
-	Command.PersistentFlags().StringVar(&cfgFile, "config", "c", "config file (default is $XDG_CONFIG_HOME/pity/pity.yaml)")
-	Command.Flags().StringVarP(&input, "input", "i", "pity.txt", "pity input file")
-	Command.Flags().StringVarP(&output, "output", "o", "", "terminal output file")
 }
 
 func initConfig() {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
+	if debug {
+		log.SetLevel(log.DebugLevel)
+	} else if verbose {
+		log.SetLevel(log.InfoLevel)
 	} else {
+		log.SetLevel(log.WarnLevel)
+	}
+
+	if configFile != "" {
+		viper.SetConfigFile(configFile)
+	} else {
+		viper.SetConfigName(CommandName)
 		conf, err := osplus.GetXdgConfigHome()
 		if err != nil {
-			panic(err)
+			log.Info(err)
+		} else {
+			viper.AddConfigPath(filepath.Join(conf, CommandName))
 		}
-		viper.AddConfigPath(filepath.Join(conf, "pity"))
-		viper.SetConfigName("pity")
+		viper.AddConfigPath(".")
 	}
+	viper.SetEnvPrefix(CommandName)
 	viper.AutomaticEnv()
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		log.Debug(err)
+	}
+	err = viper.Unmarshal(&config)
+	if err != nil {
+		log.Warn(err)
 	}
 }
 
@@ -45,16 +79,27 @@ func Main() {
 }
 
 var Command = &cobra.Command{
-	Use: "pity",
+	Use: CommandName,
 	Run: func(cmd *cobra.Command, args []string) {
 		err := run(cmd, args)
 		if err != nil {
-			logrus.Fatal(err)
+			log.Fatal(err)
 		}
 	},
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	if version {
+		fmt.Println(jc.Version)
+		return nil
+	}
+	if debug {
+		if viper.ConfigFileUsed() != "" {
+			log.Debugf("Using config file: %s", viper.ConfigFileUsed())
+		}
+		log.Debug(pp.Sprint(config))
+	}
+
 	cmdName := os.Getenv("SHELL")
 	if cmdName == "" {
 		cmdName = "sh"
@@ -67,12 +112,12 @@ func run(cmd *cobra.Command, args []string) error {
 
 	opener := osplus.NewOpener()
 	opener.Unbuffered = true
-	inputFile, err := opener.Open(input)
+	inputFile, err := opener.Open(config.Input)
 	if err != nil {
 		return err
 	}
 	defer inputFile.Close()
-	outputFile, err := opener.Create(output)
+	outputFile, err := opener.Create(config.Input)
 	if err != nil {
 		return err
 	}

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -15,7 +14,7 @@ import (
 	"time"
 
 	"github.com/kr/pty"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -62,7 +61,7 @@ func (e *Executor) Execute() error {
 func (e *Executor) commandCharWait(arg string) {
 	d, err := time.ParseDuration(arg)
 	if err != nil {
-		logrus.Warn(err)
+		log.Warn(err)
 		return
 	}
 	e.CharWait = d
@@ -71,7 +70,7 @@ func (e *Executor) commandCharWait(arg string) {
 func (e *Executor) commandLineWait(arg string) {
 	d, err := time.ParseDuration(arg)
 	if err != nil {
-		logrus.Warn(err)
+		log.Warn(err)
 		return
 	}
 	e.LineWait = d
@@ -80,7 +79,7 @@ func (e *Executor) commandLineWait(arg string) {
 func (e *Executor) commandPreLineWait(arg string) {
 	d, err := time.ParseDuration(arg)
 	if err != nil {
-		logrus.Warn(err)
+		log.Warn(err)
 		return
 	}
 	e.PreLineWait = d
@@ -89,7 +88,7 @@ func (e *Executor) commandPreLineWait(arg string) {
 func (e *Executor) commandSleep(arg string) {
 	d, err := time.ParseDuration(arg)
 	if err != nil {
-		logrus.Warn(err)
+		log.Warn(err)
 		return
 	}
 	time.Sleep(d)
@@ -106,7 +105,7 @@ func (e *Executor) commandDecimal(arg string) {
 	for _, s := range spaceRe.Split(arg, -1) {
 		_, err := fmt.Sscanf(s, "%d", &b)
 		if err != nil {
-			logrus.Warn(err)
+			log.Warn(err)
 			break
 		}
 		e.ptmx.Write([]byte{b})
@@ -118,7 +117,7 @@ func (e *Executor) commandHex(arg string) {
 	for _, s := range spaceRe.Split(arg, -1) {
 		_, err := fmt.Sscanf(s, "%x", &b)
 		if err != nil {
-			logrus.Warn(err)
+			log.Warn(err)
 			break
 		}
 		e.ptmx.Write([]byte{b})
@@ -150,10 +149,11 @@ func (e *Executor) invokeCommand(command string, arg ...string) {
 	case ">", "blockcommentend":
 		e.blockCommentDepth--
 		if e.blockCommentDepth < 0 {
+			log.Warn("unbalanced block comment")
 			e.blockCommentDepth = 0
 		}
 	default:
-		logrus.Warnf("invalid command: %s", command)
+		log.Warnf("invalid command: %s", command)
 	}
 
 }
