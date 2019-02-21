@@ -1,4 +1,4 @@
-.PHONY: build install test fmt coverage dep-init dep-ensure dep-graph pre-commit
+.PHONY: build install test fmt coverage dep-init dep-ensure dep-graph pre-commit install-pre-commit
 
 CMD_DIR := cmd/pity
 
@@ -14,7 +14,7 @@ test:
 	go test ./...
 
 fmt:
-	find . -name '*.go' | xargs gofmt -w
+	find . -name '*.go' | grep -v ./vendor/ | xargs gofmt -w
 
 coverage:
 	mkdir -p test/coverage
