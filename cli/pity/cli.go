@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/iancoleman/strcase"
 	"github.com/k0kubun/pp"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -26,15 +27,19 @@ var (
 const CommandName = "pity"
 
 func init() {
-	Command.PersistentFlags().StringVar(&configFile, "config", "", `config file (default: "pity.yml")`)
+	Command.PersistentFlags().StringVar(&configFile, "config", "", `config file (default: "`+CommandName+`.yml")`)
 	Command.Flags().StringP("input", "i", "pity.txt", "pity input file")
 	Command.Flags().StringP("output", "o", "", "terminal output file")
 	Command.Flags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	Command.Flags().BoolVarP(&version, "version", "V", false, "show Version")
 	Command.Flags().BoolVar(&debug, "debug", false, "debug output")
 
-	viper.BindPFlag("Input", Command.Flags().Lookup("input"))
-	viper.BindPFlag("Output", Command.Flags().Lookup("output"))
+	for _, s := range []string{"input", "output"} {
+		envKey := strcase.ToSnake(s)
+		structKey := strcase.ToCamel(s)
+		viper.BindPFlag(envKey, Command.Flags().Lookup(s))
+		viper.RegisterAlias(structKey, envKey)
+	}
 
 	cobra.OnInitialize(initConfig)
 }
@@ -125,7 +130,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer inputFile.Close()
-	outputFile, err := opener.Create(config.Input)
+	outputFile, err := opener.Create(config.Output)
 	if err != nil {
 		return err
 	}
