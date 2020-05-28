@@ -125,7 +125,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer inputFile.Close()
-	outputFile, err := opener.Create(config.Input)
+	outputFile, err := opener.Create(config.Output)
 	if err != nil {
 		return err
 	}
